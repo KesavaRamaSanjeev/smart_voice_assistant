@@ -38,6 +38,14 @@ class VideoPlayer:
         self.frame_buffer = None
         self.last_frame_time = 0
         
+        # Bind canvas resize event
+        self.canvas.bind('<Configure>', self._on_canvas_resize)
+        
+    def _on_canvas_resize(self, event):
+        # Update frame size when canvas is resized
+        if self.frame_buffer is not None:
+            self._update_canvas()
+        
     def play(self):
         if not self.is_playing:
             self.is_playing = True
@@ -67,9 +75,6 @@ class VideoPlayer:
                         # Convert frame to RGB
                         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         
-                        # Resize frame to fit canvas
-                        frame = cv2.resize(frame, (400, 225))
-                        
                         # Store frame in buffer
                         self.frame_buffer = frame
                         
@@ -91,13 +96,36 @@ class VideoPlayer:
     def _update_canvas(self):
         if self.frame_buffer is not None:
             try:
+                # Get canvas dimensions
+                canvas_width = self.canvas.winfo_width()
+                canvas_height = self.canvas.winfo_height()
+                
+                # Calculate aspect ratio
+                frame_height, frame_width = self.frame_buffer.shape[:2]
+                aspect_ratio = frame_width / frame_height
+                
+                # Calculate new dimensions while maintaining aspect ratio
+                if canvas_width / canvas_height > aspect_ratio:
+                    new_height = canvas_height
+                    new_width = int(new_height * aspect_ratio)
+                else:
+                    new_width = canvas_width
+                    new_height = int(new_width / aspect_ratio)
+                
+                # Resize frame to fit canvas
+                resized_frame = cv2.resize(self.frame_buffer, (new_width, new_height))
+                
                 # Convert frame to PhotoImage
-                self.current_frame = Image.fromarray(self.frame_buffer)
+                self.current_frame = Image.fromarray(resized_frame)
                 self.photo = ImageTk.PhotoImage(image=self.current_frame)
                 
                 # Update canvas
                 self.canvas.delete("all")
-                self.canvas.create_image(0, 0, image=self.photo, anchor=tk.NW)
+                
+                # Center the image in the canvas
+                x = (canvas_width - new_width) // 2
+                y = (canvas_height - new_height) // 2
+                self.canvas.create_image(x, y, image=self.photo, anchor=tk.NW)
             except Exception as e:
                 print(f"Canvas update error: {e}")
                 
@@ -419,16 +447,14 @@ class VoiceAssistantGUI:
         )
         self.video_header.pack(pady=(0, 10))
 
-        # Video canvas with 3D effect - Increased size
+        # Video canvas with 3D effect - Fill the entire container
         self.video_canvas = tk.Canvas(
             self.video_container,
-            width=600,  # Increased from 400
-            height=400,  # Increased from 225
             bg="#0A0A0A",
             highlightthickness=2,
             highlightbackground="#1E1E1E"
         )
-        self.video_canvas.pack(pady=(0, 10))
+        self.video_canvas.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
         # Initialize video player
         video_path = os.path.join("assets", "6913754_Motion Graphics_Motion Graphic_1280x720.mp4")
